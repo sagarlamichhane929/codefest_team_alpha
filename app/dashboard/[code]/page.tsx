@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import QRCode from 'react-qr-code';
 
 interface Participant {
   _id: string;
@@ -86,6 +87,23 @@ export default function DashboardPage() {
             </p>
             <p>End Time: {new Date(room.settings.endTime).toLocaleString()}</p>
             <p>Total Participants: {room.participants.length}</p>
+            <div className="mt-2">
+              <p>
+                Room Code: <strong>{code}</strong>
+              </p>
+              <Button
+                onClick={() => navigator.clipboard.writeText(code)}
+                className="mr-2"
+              >
+                Copy Code
+              </Button>
+              <div className="mt-2">
+                <QRCode
+                  value={`${window.location.origin}/join-room?code=${code}`}
+                  size={128}
+                />
+              </div>
+            </div>
           </div>
           <h3>Participants ({room.participants.length}):</h3>
           <ul className="list-disc pl-5">

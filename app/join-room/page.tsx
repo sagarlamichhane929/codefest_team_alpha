@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -28,11 +28,21 @@ export default function JoinRoom() {
     register,
     handleSubmit,
     formState: { errors },
+    setValue,
   } = useForm<JoinForm>({
     resolver: zodResolver(joinSchema),
   });
   const router = useRouter();
   const { data: session } = useSession();
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const codeFromUrl = urlParams.get('code');
+    if (codeFromUrl) {
+      setValue('code', codeFromUrl.toUpperCase());
+      // Optionally, auto-submit or go to step 2
+    }
+  }, [setValue]);
 
   const onSubmit = async (data: JoinForm) => {
     if (step === 1) {
