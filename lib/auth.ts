@@ -33,7 +33,7 @@ export const authConfig = {
         return {
           id: user._id.toString(),
           email: user.email,
-          name: user.username,
+          name: user.username || user.email,
         };
       },
     }),

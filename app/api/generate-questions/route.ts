@@ -1,3 +1,4 @@
+// app/api/generate-questions/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
@@ -7,25 +8,20 @@ export async function POST(request: NextRequest) {
   const { syllabus } = await request.json();
 
   if (!syllabus) {
-    return NextResponse.json(
-      { error: 'Syllabus is required' },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: 'Syllabus is required' }, { status: 400 });
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+    // Use a current, free model (gemini-pro is gone)
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
-    const prompt = `
-Generate 5 multiple-choice questions based on the following syllabus: ${syllabus}
+    const prompt = `Generate exactly 5 multiple-choice questions from this syllabus: ${syllabus}
 
-Each question should have:
-- A question text
-- 4 options (a, b, c, d)
-- The correct answer (one of a, b, c, d)
-- A brief explanation
+Rules:
+- Output ONLY a valid JSON array (no markdown, no extra text)
+- Exactly 5 objects
+- Each object must match this exact shape:
 
-Format the response as a JSON array of objects, each with:
 {
   "questionText": "string",
   "options": [
@@ -34,25 +30,52 @@ Format the response as a JSON array of objects, each with:
     {"text": "string", "id": "c"},
     {"text": "string", "id": "d"}
   ],
-  "correctAnswer": "a", // or b, c, d
+  "correctAnswer": "a" | "b" | "c" | "d",
   "explanation": "string"
 }
 
-Ensure the questions are relevant and educational.
-`;
+Syllabus:
+${syllabus}`;
 
     const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+    const response = result.response;
 
-    // Parse the JSON from the response
-    const questions = JSON.parse(text);
+    // ← THIS IS THE FIX
+    const text = response.text();   // <-- call the function!
+    console.log('Raw AI response:', text);
+
+    // Clean possible code fences
+    let jsonString = text.trim();
+    if (jsonString.startsWith('```json')) {
+      jsonString = jsonString.slice(7).replace(/```$/, '').trim();
+    } else if (jsonString.startsWith('```')) {
+      jsonString = jsonString.slice(3).replace(/```$/, '').trim();
+    }
+
+    let questions;
+    try {
+      questions = JSON.parse(jsonString);
+    } catch (e) {
+      console.error('JSON parse failed:', e);
+      return NextResponse.json(
+        { error: 'AI returned invalid JSON' },
+        { status: 500 }
+      );
+    }
+
+    // Basic validation
+    if (!Array.isArray(questions) || questions.length !== 5) {
+      return NextResponse.json(
+        { error: 'Expected exactly 5 questions' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({ questions });
-  } catch (error) {
-    console.error('Error generating questions:', error);
+  } catch (error: any) {
+    console.error('Generation error:', error);
     return NextResponse.json(
-      { error: 'Failed to generate questions' },
+      { error: 'Failed to generate questions', details: error.message },
       { status: 500 }
     );
   }

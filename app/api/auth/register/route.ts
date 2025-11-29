@@ -8,18 +8,25 @@ export async function POST(request: NextRequest) {
 
   const { email, username, password } = await request.json();
 
-  if (!email || !username || !password) {
+  const trimmedUsername = username.trim();
+  if (!email || !trimmedUsername || !password) {
     return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
   }
 
-  const existingUser = await User.findOne({ $or: [{ email }, { username }] });
+  const existingUser = await User.findOne({
+    $or: [{ email }, { trimmedUsername }],
+  });
   if (existingUser) {
     return NextResponse.json({ error: 'User already exists' }, { status: 400 });
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  const user = new User({ email, username, password: hashedPassword });
+  const user = new User({
+    email,
+    username: trimmedUsername,
+    password: hashedPassword,
+  });
   await user.save();
 
   return NextResponse.json({ message: 'User created' }, { status: 201 });

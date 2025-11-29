@@ -37,6 +37,7 @@ type RoomForm = z.infer<typeof roomSchema>;
 export default function CreateRoom() {
   const [step, setStep] = useState(1);
   const [syllabus, setSyllabus] = useState('');
+  const [generating, setGenerating] = useState(false);
   const {
     register,
     handleSubmit,
@@ -97,11 +98,17 @@ export default function CreateRoom() {
         body: JSON.stringify(data),
       });
       if (response.ok) {
-        const { code } = await response.json();
+        const data = await response.json();
+        console.log('Room created:', data);
+        const { code } = data;
         toast.success(`Room created! Code: ${code}`);
-        // redirect or something
+        window.location.href = `/dashboard/${code}`;
       } else {
-        toast.error('Error creating room');
+        const errorData = await response.json();
+        console.error('Error creating room:', errorData);
+        toast.error(
+          'Error creating room: ' + (errorData.error || 'Unknown error')
+        );
       }
     }
   };
@@ -130,18 +137,45 @@ export default function CreateRoom() {
       toast.error('Please enter a syllabus');
       return;
     }
-    const response = await fetch('/api/generate-questions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ syllabus }),
-    });
-    if (response.ok) {
-      const { questions } = await response.json();
-      const current = watch('questions') || [];
-      setValue('questions', [...current, ...questions]);
-      toast.success('Questions generated successfully!');
-    } else {
-      toast.error('Failed to generate questions');
+    setGenerating(true);
+    console.log('Generating questions for syllabus:', syllabus);
+    try {
+      const response = await fetch('/api/generate-questions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ syllabus }),
+      });
+      console.log('Response status:', response.status);
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Response data:', data);
+        const { questions } = data;
+        const current = watch('questions') || [];
+        const isFirstEmpty =
+          current.length === 1 &&
+          !current[0].questionText.trim() &&
+          current[0].options.every((opt: any) => !opt.text.trim()) &&
+          !current[0].correctAnswer &&
+          !current[0].explanation.trim();
+        if (isFirstEmpty) {
+          setValue('questions', questions);
+        } else {
+          setValue('questions', [...current, ...questions]);
+        }
+        toast.success('Questions generated successfully!');
+      } else {
+        const errorData = await response.json();
+        console.error('Error response:', errorData);
+        toast.error(
+          'Failed to generate questions: ' +
+            (errorData.error || 'Unknown error')
+        );
+      }
+    } catch (error) {
+      console.error('Fetch error:', error);
+      toast.error('Failed to generate questions: Network error');
+    } finally {
+      setGenerating(false);
     }
   };
 
@@ -213,9 +247,12 @@ export default function CreateRoom() {
                   <Button
                     type="button"
                     onClick={generateQuestions}
+                    disabled={generating}
                     className="mt-2"
                   >
-                    Generate Questions with AI
+                    {generating
+                      ? 'Generating...'
+                      : 'Generate Questions with AI'}
                   </Button>
                 </div>
                 <h2>Add Questions</h2>
